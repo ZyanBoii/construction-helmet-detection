@@ -1,0 +1,21 @@
+# Python virtual environments and caches
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local Ultralytics configuration
+Ultralytics/
+
+# Training data and source archives are not needed by the public demo.
+archive/
+construction_helmet_yolo/
+helmet_extra.v1i.yolo26/
+
+# Model and training outputs are ignored by default. Add the deployment model
+# explicitly with git add -f so plots and temporary artifacts stay excluded.
+*.pt
+/runs/
+
+# Local editor and environment files
+.env
+.vscode/

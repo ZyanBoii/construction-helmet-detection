@@ -2,11 +2,15 @@
    # -m streamlit run streamlit_app.py
 from pathlib import Path
 import os
+import threading
 
+import av
+import cv2
 import numpy as np
 import streamlit as st
 import torch
 from PIL import Image
+from streamlit_webrtc import WebRtcMode, webrtc_streamer
 
 # Keep Ultralytics settings inside this project on Windows.
 os.environ.setdefault(
@@ -26,6 +30,7 @@ MODEL_PATH = (
     / "best.pt"
 )
 INFERENCE_DEVICE = 0 if torch.cuda.is_available() else "cpu"
+MODEL_INFERENCE_LOCK = threading.Lock()
 
 
 @st.cache_resource # for : not run from start when user input (for reduce memory)
@@ -33,6 +38,93 @@ def load_model() -> YOLO:
     """Load the model once instead of loading it on every Streamlit rerun."""
     return YOLO(str(MODEL_PATH))
 
+
+def show_live_camera(model: YOLO, confidence: float) -> None:
+    """Run browser-camera inference and return annotated WebRTC frames."""
+    st.subheader("Live camera detection (beta)")
+    st.caption(
+        "Click START and allow camera access. Cloud inference may have lower "
+        "frame rate because it normally runs on CPU."
+    )
+
+    def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
+        frame_bgr = frame.to_ndarray(format="bgr24")
+
+        # The cached model can be shared by callbacks, so protect prediction.
+        with MODEL_INFERENCE_LOCK:
+            result = model.predict(
+                source=frame_bgr,
+                imgsz=416,
+                conf=confidence,
+                device=INFERENCE_DEVICE,
+                verbose=False,
+            )[0]
+
+        annotated = result.plot()
+        helmet_count = 0
+        no_helmet_count = 0
+
+        for box in result.boxes:
+            class_name = result.names[int(box.cls[0])]
+            if class_name == "helmet":
+                helmet_count += 1
+            elif class_name == "no_helmet":
+                no_helmet_count += 1
+
+        if no_helmet_count > 0:
+            status_text = "WARNING: NO HELMET DETECTED"
+            status_color = (0, 0, 255)
+        elif helmet_count > 0:
+            status_text = "HELMET DETECTED"
+            status_color = (0, 170, 0)
+        else:
+            status_text = "NO HEAD DETECTED"
+            status_color = (0, 190, 255)
+
+        cv2.rectangle(annotated, (8, 8), (510, 82), (20, 20, 20), -1)
+        cv2.putText(
+            annotated,
+            status_text,
+            (18, 38),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.72,
+            status_color,
+            2,
+            cv2.LINE_AA,
+        )
+        cv2.putText(
+            annotated,
+            f"Helmet: {helmet_count}   No helmet: {no_helmet_count}",
+            (18, 68),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.62,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
+
+        return av.VideoFrame.from_ndarray(annotated, format="bgr24")
+
+    webrtc_streamer(
+        key="construction-helmet-live-camera",
+        mode=WebRtcMode.SENDRECV,
+        video_frame_callback=video_frame_callback,
+        rtc_configuration={
+            "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+        },
+        media_stream_constraints={
+            "video": {"width": {"ideal": 640}, "height": {"ideal": 480}},
+            "audio": False,
+        },
+        async_processing=True,
+    )
+
+    st.warning(
+        "Live mode is an educational beta. If START cannot connect on a "
+                "restricted network, use the camera snapshot or image upload mode. "
+                "  \n**Thanks a million for using my Demo.**  \n"
+                "Zyanobii (Nay Lin)"
+    )
 
 def main() -> None:
     st.set_page_config(
@@ -67,9 +159,15 @@ def main() -> None:
 
     source_type = st.radio(
         "Choose an input",
-        ["Upload image", "Use camera"],
+        ["Upload image", "Use camera snapshot", "Live camera (beta)"],
         horizontal=True,
     )
+
+    model = load_model()
+
+    if source_type == "Live camera (beta)":
+        show_live_camera(model, confidence)
+        return
 
     uploaded_file = None
     if source_type == "Upload image":
@@ -88,7 +186,6 @@ def main() -> None:
     image_rgb = np.asarray(image)
     # Ultralytics treats NumPy image sources as OpenCV-style BGR.
     image_bgr = np.ascontiguousarray(image_rgb[:, :, ::-1])
-    model = load_model()
 
     with st.spinner("Detecting..."):
         result = model.predict(

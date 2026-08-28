@@ -109,9 +109,6 @@ def show_live_camera(model: YOLO, confidence: float) -> None:
         key="construction-helmet-live-camera",
         mode=WebRtcMode.SENDRECV,
         video_frame_callback=video_frame_callback,
-        rtc_configuration={
-            "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
-        },
         media_stream_constraints={
             "video": {"width": {"ideal": 640}, "height": {"ideal": 480}},
             "audio": False,

@@ -31,6 +31,11 @@ MODEL_PATH = (
 )
 INFERENCE_DEVICE = 0 if torch.cuda.is_available() else "cpu"
 MODEL_INFERENCE_LOCK = threading.Lock()
+LIVE_CAMERA_ENABLED = os.getenv("ENABLE_LIVE_CAMERA", "true").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
 
 @st.cache_resource # for : not run from start when user input (for reduce memory)
@@ -154,9 +159,13 @@ def main() -> None:
         help="Increase this value if false alerts are too frequent.",
     )
 
+    input_options = ["Upload image", "Use camera snapshot"]
+    if LIVE_CAMERA_ENABLED:
+        input_options.append("Live camera (beta)")
+
     source_type = st.radio(
         "Choose an input",
-        ["Upload image", "Use camera snapshot", "Live camera (beta)"],
+        input_options,
         horizontal=True,
     )
 
@@ -195,7 +204,7 @@ def main() -> None:
 
     # Request an RGB PIL image directly to avoid another BGR/RGB mismatch.
     annotated_image = result.plot(pil=True)
-    st.image(annotated_image, caption="Detection result", use_container_width=True)
+    st.image(annotated_image, caption="Detection result", width="stretch")
 
     no_helmet_count = 0
     helmet_count = 0

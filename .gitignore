@@ -19,3 +19,9 @@ helmet_extra.v1i.yolo26/
 # Local editor and environment files
 .env
 .vscode/
+
+# Personal local learning notes
+GITHUB_USAGE_ROADMAP_MM.md
+ 
+/output/pdf/
+tmp/

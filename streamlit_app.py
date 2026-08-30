@@ -8,9 +8,9 @@ import av
 import cv2
 import numpy as np
 import streamlit as st
-import torch
-from PIL import Image
-from streamlit_webrtc import WebRtcMode, webrtc_streamer
+import torch #for choosing cpu/gpu detection device
+from PIL import Image #image read
+from streamlit_webrtc import WebRtcMode, webrtc_streamer #for camera live
 
 # Keep Ultralytics settings inside this project on Windows.
 os.environ.setdefault(
@@ -29,7 +29,7 @@ MODEL_PATH = (
     / "weights"
     / "best.pt"
 )
-INFERENCE_DEVICE = 0 if torch.cuda.is_available() else "cpu"
+INFERENCE_DEVICE = 0 if torch.cuda.is_available() else "cpu" #choosing gpu and cpu
 MODEL_INFERENCE_LOCK = threading.Lock()
 LIVE_CAMERA_ENABLED = os.getenv("ENABLE_LIVE_CAMERA", "true").lower() in {
     "1",
@@ -46,7 +46,7 @@ def load_model() -> YOLO:
 
 def show_live_camera(model: YOLO, confidence: float) -> None:
     """Run browser-camera inference and return annotated WebRTC frames."""
-    st.subheader("Live camera detection (beta)")
+    st.subheader("Live camera detection ")
     st.caption(
         "Click START and allow camera access. Cloud inference may have lower "
         "frame rate because it normally runs on CPU."
@@ -135,15 +135,35 @@ def main() -> None:
         layout="wide",
         #layout="centered",
     )
+    
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-color:#040029;
+        }
+         h1 {
+        color: #FF0000 !important;
+        text-align: center;
+        }
+       
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
+    
+    # st.markdown(
+    # "<h1 style='text-align:center; color:red;'>Construction Safety Helmet Detect and Alert</h1>",
+    # unsafe_allow_html=True)
+    
     st.title("Construction Safety Helmet Detect and Alert")
     st.write(
         "Upload an image or take a camera snapshot. "
         "The model checks for helmet and no-helmet detections. ^_^"
     )
     st.caption(
-        "University demonstration only. Do not use this application as the "
-        "sole construction-safety control."
+        "Class project demonstration only."
     )
 
     if not MODEL_PATH.is_file():
@@ -151,7 +171,7 @@ def main() -> None:
         st.stop()
 
     confidence = st.slider(
-        "Detection confidence",
+        "Detection Confidence",
         min_value=0.10,
         max_value=0.90,
         value=0.25,
@@ -193,14 +213,14 @@ def main() -> None:
     # Ultralytics treats NumPy image sources as OpenCV-style BGR.
     image_bgr = np.ascontiguousarray(image_rgb[:, :, ::-1])
 
-    with st.spinner("Detecting..."):
+    with st.spinner("Detecting..."): #spinner -loading animation
         result = model.predict(
             source=image_bgr,
             imgsz=416,
             conf=confidence,
             device=INFERENCE_DEVICE,
             verbose=False,
-        )[0]
+        )[0] # [0] for first photo
 
     # Request an RGB PIL image directly to avoid another BGR/RGB mismatch.
     annotated_image = result.plot(pil=True)
